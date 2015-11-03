@@ -41,6 +41,7 @@ rsync -av ${TOP}/ \
     --exclude /deps/ \
     --exclude /tools/ \
     --exclude /tmp/
+    $extraOpts
 
 state=$(ssh ${NODE} svcs -z ${FWAPI_ZONE} -H -o state fwapi)
 if [[ "$state" == "maintenance" ]]; then
