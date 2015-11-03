@@ -216,6 +216,40 @@ function del(t, opts, callback) {
     });
 }
 
+/**
+ * Delete a firewall rules that affect a specific machine (and only that
+ * machine).
+ */
+function deleteVMrules(t, opts, callback)
+{
+
+    assert.object(t, 't');
+    assert.object(opts, 'opts');
+    assert.optionalFunc(callback, 'callback');
+
+    assert.string(opts.uuid, 'opts.uuid');
+    assert.optionalObject(opts.expErr, 'opts.expErr');
+    assert.optionalObject(opts.params, 'opts.params');
+
+    var client = opts.client || mod_client.get('fwapi');
+    var desc = fmt(' (del VM\'s Rules = %s)', opts.uuid);
+    var params = opts.params || {};
+
+    t.ok(opts.uuid, 'uuid ' + desc);
+    LOG.debug({opts: opts}, 'deleting VM\'s rules');
+    /*
+     * This endpoint NEVER returns an error. If it returns an error, then we
+     * have an error on our hands.
+     */
+    client.delVMrules(opts.uuid, params, function (err, res) {
+        t.ok(err === null, 'No error code, as expected.');
+        if (err) {
+            return;
+        }
+        callback(err, res);
+    });
+}
+
 
 /**
  * Deletes all rules created
@@ -261,6 +295,7 @@ function delAndGet(t, opts, callback) {
  * Get a firewall rule
  */
 function get(t, opts, callback) {
+
     assert.object(t, 't');
     assert.object(opts, 'opts');
     assert.optionalFunc(callback, 'callback');
@@ -600,5 +635,6 @@ module.exports = {
     update: update,
     updateAndGet: updateAndGet,
     resolve: resolve,
-    vmRules: vmRules
+    vmRules: vmRules,
+    deleteVMrules: deleteVMrules
 };

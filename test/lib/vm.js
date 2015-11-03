@@ -35,7 +35,7 @@ var VM_PARAMS = {
     image_uuid: config.test.provision_image,
     networks: [ { name: 'external' } ],
     brand: 'joyent',
-    ram: 128
+    ram: 512
 };
 var VM_NUM = 0;
 var LOG = mod_log.child({ component: 'vm' });
@@ -206,6 +206,8 @@ function delAllCreated(t, callback) {
  * Delete a single VM
  */
 function delOne(t, opts, callback) {
+    console.log(opts);
+    console.log(opts.uuid);
     assert.string(opts.uuid, 'opts.uuid');
 
     var client = opts.client || mod_client.get('vmapi');
@@ -379,5 +381,6 @@ module.exports = {
     del: del,
     delAllCreated: delAllCreated,
     provision: provision,
-    update: update
+    update: update,
+    delOne: delOne
 };

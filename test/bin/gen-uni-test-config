@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+#
+
+#
+# Copyright (c) 2014, Joyent, Inc.
+#
+
+#
+# Generate test/config.json for running multi-server integration tests.
+
+if [ "$TRACE" != "" ]; then
+    export PS4='${BASH_SOURCE}:${LINENO}: ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
+    set -o xtrace
+fi
+
+set -o errexit
+set -o pipefail
+
+
+
+#---- support functions
+
+function fatal
+{
+    echo "$(basename $0): fatal error: $*"
+    exit 1
+}
+
+#---- main
+
+dir=$(unset CDPATH; cd $(dirname $0); pwd)
+test_dir=$(unset CDPATH; cd $(dirname $0)/..; pwd)
+json_file=${test_dir}/config.json
+json_in_file=${test_dir}/config.json.in
+vmapi_url=$(json -f /opt/smartdc/fwapi/config.json vmapi.url)
+imgapi_url=${vmapi_url//vmapi/imgapi}
+cnapi_url=${vmapi_url//vmapi/cnapi}
+
+[[ -z ${vmapi_url} ]] && fatal "Could not get vmapi URL from fwapi's config.json"
+
+image_uuid=$(curl -sS ${imgapi_url}/images'?name=sdc-smartos' | json 0.uuid)
+[[ -z ${image_uuid} ]] && fatal "Could not find an image named sdc-smartos in IMGAPI"
+
+
+servers=( $(curl -sS ${cnapi_url}/servers | json -a uuid setup | grep true | awk '{ print $1 }' | head -n 1) )
+
+[[ -z ${servers[0]} ]] && fatal "Could not get server1 from CNAPI"
+
+${dir}/add-test-user
+
+echo "Writing single-server test config: ${json_file}"
+sed -e "s,{{PROVISION_IMAGE}},${image_uuid}," \
+    -e "s,{{SERVER1_UUID}},${servers[0]}," \
+    -e "s,{{SERVER2_UUID}},," \
+    -e "s,{{FWAPI_URL}},${vmapi_url//vmapi/fwapi}," \
+    -e "s,{{NAPI_URL}},${vmapi_url//vmapi/napi}," \
+    -e "s,{{VMAPI_URL}},${vmapi_url}," \
+    -e "s,{{WFAPI_URL}},${vmapi_url//vmapi/wfapi}," \
+    ${json_in_file} > ${json_file}
