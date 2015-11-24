@@ -217,7 +217,7 @@ function del(t, opts, callback) {
 }
 
 /**
- * Delete a firewall rules that affect a specific machine (and only that
+ * Delete firewall rules that affect a specific machine (and only that
  * machine).
  */
 function deleteVMrules(t, opts, callback)
@@ -295,7 +295,6 @@ function delAndGet(t, opts, callback) {
  * Get a firewall rule
  */
 function get(t, opts, callback) {
-
     assert.object(t, 't');
     assert.object(opts, 'opts');
     assert.optionalFunc(callback, 'callback');

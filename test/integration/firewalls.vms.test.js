@@ -30,7 +30,7 @@ var NVM = 8;
 
 /*
  * Create NVM number of VMs. Use them for our evil experiments. We use mod_vm's
- * provision() function which takes, an array of VM-configs as an option, and
+ * provision() function which takes an array of VM configs as an option, and
  * uses those to create the VMs just how we like them.
  */
 exports.setup = function (t)
@@ -55,7 +55,6 @@ exports.setup = function (t)
             VMS = res;
         }
 
-        VMS.sort();
         t.done();
         return (t);
     });
@@ -93,22 +92,16 @@ function all_vm_list(limit)
     if (limit) {
         N = limit;
     }
+
     var ret = '';
-    var opar = false;
     assert.arrayOfObject(VMS, 'VMS');
-    var i = 0;
-    while (i < N) {
-        assert.uuid(VMS[i].uuid, 'VMS[i].uuid');
-        if (!opar) {
-            ret = '( VM ' + VMS[i].uuid;
-            opar = true;
-        } else {
-            ret = ret + ' OR' + ' VM ' + VMS[i].uuid;
-        }
-        i++;
-    }
-    ret = ret + ')';
-    return (ret);
+
+    var vm_map_cb = function (vm) {
+        assert.uuid(vm.uuid);
+        return 'VM' + vm.uuid;
+    };
+
+    return '(' + VMS.slice(0, N).map(vm_map_cb).join(' OR ') + ')';
 }
 
 /*
@@ -120,7 +113,7 @@ function two_vm_list(a, b)
     assert.arrayOfObject(VMS, 'VMS');
     assert.number(a, 'a');
     assert.number(b, 'b');
-    ret = '( VM ' + VMS[a].uuid + ' OR' + ' VM ' + VMS[b].uuid + ')';
+    ret = '( VM ' + VMS[a].uuid + ' OR VM ' + VMS[b].uuid + ')';
     return (ret);
 }
 
@@ -156,14 +149,12 @@ exports.singleMachineCase = function (t)
      * endpoint (deleteVMrules), also take a callback which checks to see if
      * these rules still exist.
      */
-    var rule_create_cb = function (invocation, err, res) {
-        t.ok(err === null, 'Should not err whe creating rule.');
+    var rule_create_cb = function (invocation, err, rule) {
+        t.ok(err === null, 'Should not err when creating rule.');
         if (err) {
             t.done();
             return;
         }
-
-        var rule = res;
 
         mod_rule.deleteVMrules(t, {
             uuid: VMS[0].uuid,
@@ -176,7 +167,25 @@ exports.singleMachineCase = function (t)
                     /* This rule should be deleted by now. */
                     if (err3) {
                         /*
-                         * If we've finished with rule1, we move on to rule 2.
+                         * rule_create_cb() gets called in two contexts. It
+                         * gets called as a consequence of our first call to
+                         * `mod_rule.create()` at the bottom of the
+                         * `singleMachineCase()` function. It also gets called
+                         * on itself as a consequence of calling
+                         * `mod_rule.create()` in the if-block below. Both of
+                         * these invocations do esseintally the same thing.
+                         * Except that invocation 1 results in a single
+                         * iteration of a recursive-loop -- it calls
+                         * `mod_rule.create()`, on rule 2, passing itself as a
+                         * callback. We only have 2 rules, so on the second
+                         * invocation, we terminate this loop/recursion by
+                         * verifying that the rule has been deleted, and ending
+                         * the test via `t.done()`.
+                         *
+                         * In other words, `invocation` is akin to a loop
+                         * counter, and the counter can never exceed 2.
+                         *
+                         * There is probably a better way to do this.
                          */
                         if (invocation == 1) {
                             mod_rule.create(t, {rule: rule2raw},
@@ -218,7 +227,6 @@ var multiMachineCaseCommon = function (t, rule1raw, targ_uuid, delVMuuid)
 
 
     var destroy_vm_cb = function (err, res) {
-        /* XXX should never have err */
         t.ok(err === null, 'err === null in destroy_vm_cb');
         if (err) {
             t.done();
@@ -230,22 +238,11 @@ var multiMachineCaseCommon = function (t, rule1raw, targ_uuid, delVMuuid)
             params: {
                 owner_uuid: OWNERS[0]
             },
-            expCode: 204}, delete_vm_rules_cb);
+            expCode: 204
+        }, delete_vm_rules_err_cb);
     };
 
-    var invok = 0;
-
-    var rule_get_cb = function (invocation, err, res) {
-        invok++;
-        /*
-         * Since we have a bug in the endpoint that causes an infinite loop, we
-         * want to limit the number of calls to this funciton to some small
-         * number.
-         */
-        if (invocation > 10) {
-            t.done();
-            return;
-        }
+    var rule_get_cb = function (err, res) {
         /*
          * If the rule still exists, we need to delete a VM. Otherwise we are
          * done.
@@ -259,28 +256,21 @@ var multiMachineCaseCommon = function (t, rule1raw, targ_uuid, delVMuuid)
 
     var created_rule;
 
+    /* This function expects to receive an error when getting rules. */
+    var delete_vm_rules_err_cb = function (err, res) {
+        mod_rule.get(t, {uuid: created_rule.uuid, expErr: expErr,
+            expCode: 404}, rule_get_cb);
+    };
+
+    /* This function expects to succeed when getting rules. */
     var delete_vm_rules_cb = function (err, res) {
-            /*
-             * When we call mod_rule.get() we can alternately expect an error
-             * or not. The first time we try to get a rule, we expect to
-             * actually get it (because it wasn't yet deleted). The second
-             * time, it should be gone. So, if our attempt-number (get_attempt)
-             * is even we can expect to get an error.
-             */
-            if (!(get_attempt % 2)) {
-                get_attempt++;
-                mod_rule.get(t, {uuid: created_rule.uuid, expErr: expErr,
-                    expCode: 404}, rule_get_cb.bind(null, invok));
-            } else {
-                get_attempt++;
-                mod_rule.get(t, {uuid: created_rule.uuid},
-                    rule_get_cb.bind(null, invok));
-            }
+        mod_rule.get(t, {uuid: created_rule.uuid},
+            rule_get_cb);
     };
 
 
     var rule_create_cb = function (err, res) {
-        t.ok(err === null, 'Should not err whe creating rule.');
+        t.ok(err === null, 'Should not err when creating rule.');
         if (err) {
             t.done();
             return;
