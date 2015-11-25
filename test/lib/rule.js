@@ -243,9 +243,6 @@ function deleteVMrules(t, opts, callback)
      */
     client.delVMrules(opts.uuid, params, function (err, res) {
         t.ok(err === null, 'No error code, as expected.');
-        if (err) {
-            return;
-        }
         callback(err, res);
     });
 }
