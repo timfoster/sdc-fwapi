@@ -93,12 +93,11 @@ function all_vm_list(limit)
         N = limit;
     }
 
-    var ret = '';
     assert.arrayOfObject(VMS, 'VMS');
 
     var vm_map_cb = function (vm) {
         assert.uuid(vm.uuid);
-        return 'VM' + vm.uuid;
+        return 'VM ' + vm.uuid;
     };
 
     return '(' + VMS.slice(0, N).map(vm_map_cb).join(' OR ') + ')';
@@ -215,10 +214,6 @@ exports.singleMachineCase = function (t)
 
 var multiMachineCaseCommon = function (t, rule1raw, targ_uuid, delVMuuid)
 {
-
-
-    /* This represents the rule-get we are attempting (present tense) */
-    var get_attempt = 1;
 
     var expErr = {
         code: 'ResourceNotFound',
