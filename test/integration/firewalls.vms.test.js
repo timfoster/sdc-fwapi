@@ -12,6 +12,7 @@
  * Unit tests for /firewalls/vms/:uuid endpoint.
  */
 
+var test = require('tape');
 var assert = require('assert-plus');
 var fmt = require('util').format;
 var helpers = require('./helpers');
@@ -33,7 +34,7 @@ var NVM = 8;
  * provision() function which takes an array of VM configs as an option, and
  * uses those to create the VMs just how we like them.
  */
-exports.setup = function (t)
+test('setup', function (t)
 {
     var vms = [];
     for (var vi = 0; vi < NVM; vi++) {
@@ -55,10 +56,10 @@ exports.setup = function (t)
             VMS = res;
         }
 
-        t.done();
+        t.end();
         return (t);
     });
-};
+});
 
 
 
@@ -116,7 +117,7 @@ function two_vm_list(a, b)
     return (ret);
 }
 
-exports.singleMachineCase = function (t)
+test('singleMachineCase', function (t)
 {
     /* create 2 rules (we arbitrarily use port 22) */
     var rule1raw = {
@@ -151,7 +152,7 @@ exports.singleMachineCase = function (t)
     var rule_create_cb = function (invocation, err, rule) {
         t.ok(err === null, 'Should not err when creating rule.');
         if (err) {
-            t.done();
+            t.end();
             return;
         }
 
@@ -179,7 +180,7 @@ exports.singleMachineCase = function (t)
                          * callback. We only have 2 rules, so on the second
                          * invocation, we terminate this loop/recursion by
                          * verifying that the rule has been deleted, and ending
-                         * the test via `t.done()`.
+                         * the test via `t.end()`.
                          *
                          * In other words, `invocation` is akin to a loop
                          * counter, and the counter can never exceed 2.
@@ -197,11 +198,11 @@ exports.singleMachineCase = function (t)
                                  * error.
                                  */
                                 t.ok(err4 !== null, 'err4 !== null');
-                                t.done();
+                                t.end();
                             });
                         }
                     } else {
-                        t.done();
+                        t.end();
                     }
                 });
              });
@@ -210,10 +211,11 @@ exports.singleMachineCase = function (t)
     mod_rule.create(t, {rule: rule1raw}, rule_create_cb.bind(null, 1));
 
     return (t);
-};
+});
 
 var multiMachineCaseCommon = function (t, rule1raw, targ_uuid, delVMuuid)
 {
+
 
     var expErr = {
         code: 'ResourceNotFound',
@@ -224,7 +226,7 @@ var multiMachineCaseCommon = function (t, rule1raw, targ_uuid, delVMuuid)
     var destroy_vm_cb = function (err, res) {
         t.ok(err === null, 'err === null in destroy_vm_cb');
         if (err) {
-            t.done();
+            t.end();
             return;
         }
 
@@ -245,7 +247,7 @@ var multiMachineCaseCommon = function (t, rule1raw, targ_uuid, delVMuuid)
         if (!err) {
             mod_vm.delOne(t, {uuid: delVMuuid}, destroy_vm_cb);
         } else {
-            t.done();
+            t.end();
         }
     };
 
@@ -267,7 +269,7 @@ var multiMachineCaseCommon = function (t, rule1raw, targ_uuid, delVMuuid)
     var rule_create_cb = function (err, res) {
         t.ok(err === null, 'Should not err when creating rule.');
         if (err) {
-            t.done();
+            t.end();
             return;
         }
 
@@ -284,7 +286,7 @@ var multiMachineCaseCommon = function (t, rule1raw, targ_uuid, delVMuuid)
     mod_rule.create(t, {rule: rule1raw}, rule_create_cb);
 };
 
-exports.multiMachineCaseOne = function (t)
+test('multiMachineCaseOne', function (t)
 {
 
     var rule1raw = {
@@ -296,9 +298,9 @@ exports.multiMachineCaseOne = function (t)
                 all_vm_list(4), two_vm_list(0, 1))
     };
     multiMachineCaseCommon(t, rule1raw, VMS[0].uuid, VMS[1].uuid);
-};
+});
 
-exports.multiMachineCaseTwo = function (t)
+test('multiMachineCaseTwo', function (t)
 {
 
     var rule1raw = {
@@ -310,13 +312,13 @@ exports.multiMachineCaseTwo = function (t)
                 two_vm_list(2, 3), all_vm_list(4))
     };
     multiMachineCaseCommon(t, rule1raw, VMS[2].uuid, VMS[3].uuid);
-};
+});
 
 /*
  * We try this on a rule where the VM-lists are the same length (2). Target is
  * in FROM.
  */
-exports.multiMachineCaseThree = function (t)
+test('multiMachineCaseThree', function (t)
 {
     var rule1raw = {
         description: 'Small Plural FROM',
@@ -328,13 +330,13 @@ exports.multiMachineCaseThree = function (t)
     };
 
     multiMachineCaseCommon(t, rule1raw, VMS[4].uuid, VMS[5].uuid);
-};
+});
 
 /*
  * We try this on a rule where the VM-lists are the same length (2). Target is
  * in TO.
  */
-exports.multiMachineCaseFour = function (t)
+test('multiMachineCaseFour', function (t)
 {
     var rule1raw = {
         description: 'Small Plural TO',
@@ -346,29 +348,18 @@ exports.multiMachineCaseFour = function (t)
     };
 
     multiMachineCaseCommon(t, rule1raw, VMS[6].uuid, VMS[7].uuid);
-};
+});
 
 /*
  * We want to destroy any remaining VMs.
  */
-exports.teardown = function (t)
-{
+test('teardown', function (t) {
     mod_vm.delAllCreated(t, function (err, res) {
         if (err) {
             t.ok(err === null, 'Should not have errors when destroying VMs.');
-            t.done();
+            t.end();
             return;
         }
-        t.done();
+        t.end();
     });
-};
-
-module.exports = {
-    setup: exports.setup,
-    singleMachineCase: exports.singleMachineCase,
-    multiMachineCaseTwo: exports.multiMachineCaseTwo,
-    multiMachineCaseOne: exports.multiMachineCaseOne,
-    multiMachineCaseThree: exports.multiMachineCaseThree,
-    multiMachineCaseFour: exports.multiMachineCaseFour,
-    teardown: exports.teardown
-};
+});
