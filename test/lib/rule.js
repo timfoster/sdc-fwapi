@@ -238,8 +238,9 @@ function deleteVMrules(t, opts, callback)
     t.ok(opts.uuid, 'uuid ' + desc);
     LOG.debug({opts: opts}, 'deleting VM\'s rules');
     /*
-     * This endpoint NEVER returns an error. If it returns an error, then we
-     * have an error on our hands.
+     * This endpoint may return an error if fwapi times out when making
+     * requests to either vmapi or ufds. This will trigger a test failure, and
+     * the dev may wish to re-run the test suite.
      */
     client.delVMrules(opts.uuid, params, function (err, res) {
         t.ok(err === null, 'No error code, as expected.');
