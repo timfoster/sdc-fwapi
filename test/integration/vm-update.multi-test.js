@@ -42,7 +42,7 @@ var VMS = [];
 
 
 
-// Run before every t
+// Run before every test
 function pre_test(t) {
     return config.haveTestVars(
         ['owner_uuid', 'provision_image', 'server1_uuid', 'server2_uuid'],
@@ -50,16 +50,16 @@ function pre_test(t) {
 }
 
 // Make sure we have VMs to work with
-function checkVMsProvisioned(callback) {
+function checkVMsProvisioned(t2) {
     if (!VMS[0]) {
-        return callback(new Error('VM 0 not provisioned'));
+        return t2.end((new Error('VM 0 not provisioned')));
     }
 
     if (!VMS[1]) {
-        return callback(new Error('VM 1 not provisioned'));
+        return t2.end((new Error('VM 1 not provisioned')));
     }
 
-    return callback();
+    return t2.end();
 }
 
 
@@ -70,7 +70,7 @@ function checkVMsProvisioned(callback) {
 
 test('pre_test', pre_test);
 test('Add rules', function (t) {
-    test('VM 0 to VM 1', function (t2) {
+    t.test('VM 0 to VM 1', function (t2) {
         RULES.ssh1 = {
             description: 'allow SSH',
             enabled: true,
@@ -85,13 +85,13 @@ test('Add rules', function (t) {
             exp: RULES.ssh1
         });
     });
+    t.end();
 });
 
 
 /**
  * Provision two VMs with firewalls disabled
  */
-test('pre_test', pre_test);
 test('Provision VMs', function (t) {
     // Explicitly pick different servers for these VMs, since this is ting
     // that remote VMs get added to other servers.
@@ -100,14 +100,14 @@ test('Provision VMs', function (t) {
             alias: mod_vm.alias(),
             firewall_enabled: false,
             owner_uuid: OWNERS[0],
-            server_uuid: config.t.server1_uuid,
+            server_uuid: config.test.server1_uuid,
             tags: { }
         },
         {
             alias: mod_vm.alias(),
             firewall_enabled: false,
             owner_uuid: OWNERS[0],
-            server_uuid: config.t.server2_uuid,
+            server_uuid: config.test.server2_uuid,
             tags: { }
         }
     ];
@@ -130,14 +130,13 @@ test('Provision VMs', function (t) {
  * group-tests.
  */
 var group_pre_test = function (t) {
-    checkVMsProvisioned(t.end);
+    t.test(checkVMsProvisioned);
 };
 
 /**
  * Since both VMs have firewalls disabled, no rules or RVMs should have
  * been synced to either CN.
  */
-test('pre_test', pre_test);
 test('After provision: rules', function (t) {
 
     // Since both VMs have their firewalls disabled, neither should have
@@ -170,6 +169,7 @@ test('After provision: rules', function (t) {
             expErr: mod_cn.notFoundErr
         });
     });
+    t.end();
 });
 
 
@@ -177,7 +177,6 @@ test('After provision: rules', function (t) {
  * Enable VM 1's firewall. This should cause RVM 0 and the SSH rule to be
  * synced to VM1's CN.
  */
-test('pre_test', pre_test);
 test('Enable firewall', function (t) {
 
     t.test('update VM', function (t2) {
@@ -219,6 +218,7 @@ test('Enable firewall', function (t) {
             exp: VMS[0]
         });
     });
+    t.end();
 });
 
 
@@ -235,4 +235,5 @@ test('teardown', function (t) {
     t.test('delete VMs', function (t2) {
         mod_vm.delAllCreated(t2);
     });
+    t.end();
 });

@@ -151,7 +151,9 @@ test('Provision VMs', function (t) {
 });
 
 var group_pre_test = function (t) {
-    checkVMsProvisioned(t.end);
+    t.test('VMs Provisioned', function (t2) {
+        checkVMsProvisioned(t2.end);
+    });
 };
 
 test('pre_test', pre_test);
@@ -168,7 +170,6 @@ test('After provision: rules', function (t) {
         });
     });
 
-    group_pre_test(t);
     t.test('CN 0: DNS rule present', function (t2) {
         mod_cn.getRule(t2, {
             server_uuid: VMS[0].server_uuid,
@@ -179,7 +180,6 @@ test('After provision: rules', function (t) {
 
     // CN 1 (with VM 1): should have the SSH rule but not the DNS rule
 
-    group_pre_test(t);
     t.test('CN 1: SSH rule present', function (t2) {
         mod_cn.getRule(t2, {
             server_uuid: VMS[1].server_uuid,
@@ -188,7 +188,6 @@ test('After provision: rules', function (t) {
         });
     });
 
-    group_pre_test(t);
     t.test('CN 1: DNS rule not present', function (t2) {
         mod_cn.getRule(t2, {
             server_uuid: VMS[1].server_uuid,
@@ -198,7 +197,6 @@ test('After provision: rules', function (t) {
         });
     });
 
-    group_pre_test(t);
     t.test('FWAPI rules for VM 0', function (t2) {
         mod_rule.vmRules(t2, {
             uuid: VMS[0].uuid,
@@ -206,7 +204,6 @@ test('After provision: rules', function (t) {
         });
     });
 
-    group_pre_test(t);
     t.test('FWAPI rules for VM 1', function (t2) {
         mod_rule.vmRules(t2, {
             uuid: VMS[1].uuid,
@@ -242,7 +239,6 @@ test('Add disabled rule', function (t) {
     // The rule is disabled, so no rules or remote VMs should have been
     // added to either CN
 
-    group_pre_test(t);
     t.test('CN 0: DB rule not present', function (t2) {
         mod_cn.getRule(t2, {
             server_uuid: VMS[0].server_uuid,
@@ -252,7 +248,6 @@ test('Add disabled rule', function (t) {
         });
     });
 
-    group_pre_test(t);
     t.test('CN 1: DB rule not present', function (t2) {
         mod_cn.getRule(t2, {
             server_uuid: VMS[1].server_uuid,
@@ -262,7 +257,6 @@ test('Add disabled rule', function (t) {
         });
     });
 
-    group_pre_test(t);
     t.test('CN 0: RVM 1 not present', function (t2) {
         mod_cn.getRVM(t2, {
             server_uuid: VMS[0].server_uuid,
@@ -272,7 +266,6 @@ test('Add disabled rule', function (t) {
         });
     });
 
-    group_pre_test(t);
     t.test('CN 1: RVM 0 not present', function (t2) {
         mod_cn.getRVM(t2, {
             server_uuid: VMS[1].server_uuid,
@@ -282,7 +275,6 @@ test('Add disabled rule', function (t) {
         });
     });
 
-    group_pre_test(t);
     t.test('CN 1: RVM 2 not present', function (t2) {
         mod_cn.getRVM(t2, {
             server_uuid: VMS[1].server_uuid,
@@ -311,7 +303,6 @@ test('Enable rule', function (t) {
     // CN 0 (with VM 0): should have the DB rule and the
     // other RVM (VM 1) tagged with db
 
-    group_pre_test(t);
     t.test('CN 0: after enable: DB rule present', function (t2) {
         mod_cn.getRule(t2, {
             server_uuid: VMS[0].server_uuid,
@@ -320,7 +311,6 @@ test('Enable rule', function (t) {
         });
     });
 
-    group_pre_test(t);
     t.test('CN 0: RVM 1 present', function (t2) {
         mod_cn.getRVM(t2, {
             server_uuid: VMS[0].server_uuid,
@@ -333,7 +323,6 @@ test('Enable rule', function (t) {
     // CN 1 (with VM 1): should have the DB rule and the
     // other RVM (VM 0) tagged with db
 
-    group_pre_test(t);
     t.test('CN 1: after enable: DB rule present', function (t2) {
         mod_cn.getRule(t2, {
             server_uuid: VMS[1].server_uuid,
@@ -342,7 +331,6 @@ test('Enable rule', function (t) {
         });
     });
 
-    group_pre_test(t);
     t.test('CN 1: RVM 0 not present', function (t2) {
         mod_cn.getRVM(t2, {
             server_uuid: VMS[1].server_uuid,
@@ -354,7 +342,6 @@ test('Enable rule', function (t) {
     // The VM that is not referenced in the rule should not be on
     // either server
 
-    group_pre_test(t);
     t.test('CN 0: RVM 2 not present', function (t2) {
         mod_cn.getRVM(t2, {
             server_uuid: VMS[0].server_uuid,
@@ -364,7 +351,6 @@ test('Enable rule', function (t) {
         });
     });
 
-    group_pre_test(t);
     t.test('CN 1: RVM 2 not present', function (t2) {
         mod_cn.getRVM(t2, {
             server_uuid: VMS[1].server_uuid,
@@ -374,7 +360,6 @@ test('Enable rule', function (t) {
         });
     });
 
-    group_pre_test(t);
     t.test('FWAPI rules for VM 0', function (t2) {
         mod_rule.vmRules(t2, {
             uuid: VMS[0].uuid,
@@ -382,7 +367,6 @@ test('Enable rule', function (t) {
         });
     });
 
-    group_pre_test(t);
     t.test('FWAPI rules for VM 1', function (t2) {
         mod_rule.vmRules(t2, {
             uuid: VMS[1].uuid,
@@ -415,7 +399,6 @@ test('Add VMs rule', function (t) {
 
     // The rule should be added to CN 0 (VM 2's CN)
 
-    group_pre_test(t);
     t.test('CN 0: HTTPS rule not present', function (t2) {
         mod_cn.getRule(t2, {
             server_uuid: VMS[0].server_uuid,
@@ -426,7 +409,6 @@ test('Add VMs rule', function (t) {
 
     // Both the rule and RVM 2 should be added to CN 1 (VM 1's CN)
 
-    group_pre_test(t);
     t.test('CN 1: HTTPS rule present', function (t2) {
         mod_cn.getRule(t2, {
             server_uuid: VMS[1].server_uuid,
@@ -435,7 +417,6 @@ test('Add VMs rule', function (t) {
         });
     });
 
-    group_pre_test(t);
     t.test('CN 1: RVM 2 present', function (t2) {
         mod_cn.getRVM(t2, {
             server_uuid: VMS[1].server_uuid,
@@ -444,7 +425,6 @@ test('Add VMs rule', function (t) {
         });
     });
 
-    group_pre_test(t);
     t.test('FWAPI rules for VM 1', function (t2) {
         mod_rule.vmRules(t2, {
             uuid: VMS[1].uuid,
@@ -452,7 +432,6 @@ test('Add VMs rule', function (t) {
         });
     });
 
-    group_pre_test(t);
     t.test('FWAPI rules for VM 2', function (t2) {
         mod_rule.vmRules(t2, {
             uuid: VMS[2].uuid,

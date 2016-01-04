@@ -206,8 +206,6 @@ function delAllCreated(t, callback) {
  * Delete a single VM
  */
 function delOne(t, opts, callback) {
-    console.log(opts);
-    console.log(opts.uuid);
     assert.string(opts.uuid, 'opts.uuid');
 
     var client = opts.client || mod_client.get('vmapi');
