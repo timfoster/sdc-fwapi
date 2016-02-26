@@ -12,6 +12,7 @@
  * Unit tests for /firewalls/vms/:uuid endpoint.
  */
 
+var test = require('tape');
 var assert = require('assert-plus');
 var fmt = require('util').format;
 var helpers = require('./helpers');
@@ -35,7 +36,7 @@ var NVM = 9;
  * provision() function which takes an array of VM configs as an option, and
  * uses those to create the VMs just how we like them.
  */
-exports.setup = function (t)
+test('setup', function (t)
 {
     var vms = [];
     for (var vi = 0; vi < NVM; vi++) {
@@ -79,14 +80,14 @@ exports.setup = function (t)
                 return;
             }
             if (count == delVMS.length) {
-                t.done();
+                t.end();
                 return (t);
             } else {
                 return;
             }
         });
     });
-};
+});
 
 
 /*
@@ -95,10 +96,34 @@ exports.setup = function (t)
  * state. This may seem like a hack, and like polling is a better solution. But
  * it's not -- as that makes the tests unbearable slow.
  */
-exports.sleep = function (t)
+test('sleep', function (t)
 {
-    setTimeout(t.done, 5*60*1000);
-};
+    var destroyed = 0;
+    delVMS.forEach(function (vm) {
+        var checkState = function () {
+            console.log('Checking VM State...');
+            mod_vm.get(t, {uuid: vm.uuid}, function (err, vm2) {
+                if (err) {
+                    t.ok(false, 'Got error during VM state poll');
+                    t.end();
+                    return;
+                }
+                if (vm2.state == 'destroyed') {
+                    destroyed++;
+                    console.log('Destroyed...');
+                    if (destroyed == delVMS.length) {
+                        t.end();
+                        console.log('Stop Checking');
+                    }
+                    return;
+                } else {
+                    setTimeout(checkState, 1000);
+                }
+            });
+        }
+        setTimeout(checkState, 1000);
+    });
+});
 
 
 
@@ -156,103 +181,8 @@ function two_vm_list(a, b)
     return (ret);
 }
 
-var singularRules = function (t)
+var singularCommon = function (t, rule_raw, deletable)
 {
-    /* create 2 rules (we arbitrarily use port 22) */
-    var rule1raw = {
-        description: 'Singular FROM',
-        enabled: true,
-        owner_uuid: OWNERS[0],
-        rule: util.format(
-                'FROM VM %s TO %s ALLOW tcp PORT 22',
-                 VMS[0].uuid, all_vm_list(4))
-    };
-    var rule2raw = {
-        description: 'Singular TO',
-        enabled: true,
-        owner_uuid: OWNERS[0],
-        rule: util.format(
-                'FROM %s TO VM %s ALLOW tcp PORT 22',
-                all_vm_list(4), VMS[0].uuid)
-    };
-
-    var expErr = {
-        code: 'ResourceNotFound',
-        message: 'Rule not found'
-    };
-
-    /*
-     * This callback is meant to be run by the create-rule function. It does
-     * some basic checking, and then calls the FWAPI endpoint for deleting
-     * rules that affect a VM (VMS[0].uuid). The function that calls this
-     * endpoint (deleteVMrules), also take a callback which checks to see if
-     * these rules still exist.
-     */
-    var rule_create_cb = function (invocation, err, rule) {
-        t.ok(err === null, 'Should not err when creating rule.');
-        if (err) {
-            t.done();
-            return;
-        }
-
-        mod_rule.deleteVMrules(t, {
-            uuid: VMS[0].uuid,
-            params: { owner_uuid: OWNERS[0] }
-            }, function (err2, res2) {
-                mod_rule.get(t, {uuid: rule.uuid, expErr: expErr, expCode: 404},
-                    function (err3, res3) {
-
-                    t.ok(err3 !== null, 'err3 !== null');
-                    /* This rule should be deleted by now. */
-                    if (err3) {
-                        /*
-                         * rule_create_cb() gets called in two contexts. It
-                         * gets called as a consequence of our first call to
-                         * `mod_rule.create()` at the bottom of the
-                         * `singularRules()` function. It also gets called
-                         * on itself as a consequence of calling
-                         * `mod_rule.create()` in the if-block below. Both of
-                         * these invocations do esseintally the same thing.
-                         * Except that invocation 1 results in a single
-                         * iteration of a recursive-loop -- it calls
-                         * `mod_rule.create()`, on rule 2, passing itself as a
-                         * callback. We only have 2 rules, so on the second
-                         * invocation, we terminate this loop/recursion by
-                         * verifying that the rule has been deleted, and ending
-                         * the test via `t.done()`.
-                         *
-                         * In other words, `invocation` is akin to a loop
-                         * counter, and the counter can never exceed 2.
-                         *
-                         * There is probably a better way to do this.
-                         */
-                        if (invocation == 1) {
-                            mod_rule.create(t, {rule: rule2raw},
-                                rule_create_cb.bind(null, 2));
-                        } else {
-                            mod_rule.get(t, {uuid: rule.uuid, expErr: expErr,
-                                expCode: 404}, function (err4, res4) {
-                                /*
-                                 * This get-request should also return an
-                                 * error.
-                                 */
-                                t.ok(err4 !== null, 'err4 !== null');
-                                t.done();
-                            });
-                        }
-                    } else {
-                        t.done();
-                    }
-                });
-             });
-    };
-
-    mod_rule.create(t, {rule: rule1raw}, rule_create_cb.bind(null, 1));
-
-    return (t);
-};
-
-var singularCommon = function (t, rule_raw, deletable) {
     var expErr = {
         code: 'ResourceNotFound',
         message: 'Rule not found'
@@ -268,7 +198,7 @@ var singularCommon = function (t, rule_raw, deletable) {
     var rule_create_cb = function (err, rule) {
         t.ok(err === null, 'Should not err when creating rule.');
         if (err) {
-            t.done();
+            t.end();
             return;
         }
 
@@ -296,7 +226,7 @@ var singularCommon = function (t, rule_raw, deletable) {
                              * This get-request should also return an error.
                              */
                             t.ok(err4 !== null, 'err4 !== null');
-                            t.done();
+                            t.end();
                         });
                     } else {
                         mod_rule.get(t, {uuid: rule.uuid},
@@ -305,7 +235,7 @@ var singularCommon = function (t, rule_raw, deletable) {
                              * This get-request should not return an error.
                              */
                             t.ok(err4 === null, 'err4 === null');
-                            t.done();
+                            t.end();
                         });
                     }
                 });
@@ -317,7 +247,7 @@ var singularCommon = function (t, rule_raw, deletable) {
     return (t);
 };
 
-exports.singularFrom = function (t)
+test('singularFrom', function (t)
 {
     var rule_raw = {
         description: 'Singular FROM',
@@ -329,9 +259,9 @@ exports.singularFrom = function (t)
     };
     t = singularCommon(t, rule_raw, 1);
     return (t);
-};
+});
 
-exports.singularTo = function (t)
+test('singularTo', function (t)
 {
     var rule_raw = {
         description: 'Singular TO',
@@ -343,9 +273,10 @@ exports.singularTo = function (t)
     };
     t = singularCommon(t, rule_raw, 1);
     return (t);
-};
+});
 
-exports.singularFromAny = function (t) {
+test('singularFromAny', function (t)
+{
     var rule_raw = {
         description: 'Singular FROM Any',
         enabled: true,
@@ -356,9 +287,10 @@ exports.singularFromAny = function (t) {
     };
     t = singularCommon(t, rule_raw, 1);
     return (t);
-};
+});
 
-exports.singularToAny = function (t) {
+test('singularToAny', function (t)
+{
     var rule_raw = {
         description: 'Singular TO Any',
         enabled: true,
@@ -369,9 +301,10 @@ exports.singularToAny = function (t) {
     };
     t = singularCommon(t, rule_raw, 1);
     return (t);
-};
+});
 
-exports.singularFromAnyToAll = function (t) {
+test('singularFromAnyToAll', function (t)
+{
     var rule_raw = {
         description: 'Singular FROM Any TO All',
         enabled: true,
@@ -382,9 +315,10 @@ exports.singularFromAnyToAll = function (t) {
     };
     t = singularCommon(t, rule_raw, 0);
     return (t);
-};
+});
 
-exports.singularFromAll = function (t) {
+test('singularFromAll', function (t)
+{
     var rule_raw = {
         description: 'Singular FROM All',
         enabled: true,
@@ -395,9 +329,10 @@ exports.singularFromAll = function (t) {
     };
     t = singularCommon(t, rule_raw, 1);
     return (t);
-};
+});
 
-exports.singularToAll = function (t) {
+test('singularToAll', function (t)
+{
     var rule_raw = {
         description: 'Singular To All',
         enabled: true,
@@ -408,9 +343,10 @@ exports.singularToAll = function (t) {
     };
     t = singularCommon(t, rule_raw, 1);
     return (t);
-};
+});
 
-exports.singularFromAllToAny = function (t) {
+test('singularFromAllToAny', function (t)
+{
     var rule_raw = {
         description: 'Singular FROM All TO Any',
         enabled: true,
@@ -421,9 +357,10 @@ exports.singularFromAllToAny = function (t) {
     };
     t = singularCommon(t, rule_raw, 0);
     return (t);
-};
+});
 
-exports.singularFromTag = function (t) {
+test('singularFromTag', function (t)
+{
     var rule_raw = {
         description: 'Singular FROM Tag',
         enabled: true,
@@ -434,9 +371,10 @@ exports.singularFromTag = function (t) {
     };
     t = singularCommon(t, rule_raw, 0);
     return (t);
-};
+});
 
-exports.singularToTag = function (t) {
+test('singularToTag', function (t)
+{
     var rule_raw = {
         description: 'Singular TO Tag',
         enabled: true,
@@ -447,7 +385,7 @@ exports.singularToTag = function (t) {
     };
     t = singularCommon(t, rule_raw, 0);
     return (t);
-};
+});
 
 var pluralCaseCommon = function (t, rule1raw, targ_uuid, deletable)
 {
@@ -459,14 +397,14 @@ var pluralCaseCommon = function (t, rule1raw, targ_uuid, deletable)
     var created_rule;
 
     var rule_get_cb = function (err, res) {
-        t.done();
+        t.end();
     };
 
 
     var rule_create_cb = function (err, res) {
         t.ok(err === null, 'Should not err when creating rule.');
         if (err) {
-            t.done();
+            t.end();
             return;
         }
 
@@ -506,11 +444,11 @@ var pluralCaseCommon = function (t, rule1raw, targ_uuid, deletable)
     });
 };
 
-exports.pluralToNotDeletable = function (t)
+test('pluralToNotDeletable', function (t)
 {
 
     var rule1raw = {
-        description: 'Plural TO',
+        description: 'Plural TO Not Deletable',
         enabled: true,
         owner_uuid: OWNERS[0],
         rule: util.format(
@@ -518,13 +456,27 @@ exports.pluralToNotDeletable = function (t)
                 all_vm_list(4), two_vm_list(0, 1))
     };
     pluralCaseCommon(t, rule1raw, VMS[0].uuid, 0);
-};
+});
 
-exports.pluralToDeletable = function (t)
+test('pluralToAllNotDeletable', function (t)
 {
 
     var rule1raw = {
-        description: 'Plural TO',
+        description: 'Plural TO All Not Deletable',
+        enabled: true,
+        owner_uuid: OWNERS[0],
+        rule: util.format(
+                'FROM %s TO %s ALLOW tcp PORT 22',
+                all_vm_list(0, 1), 'ALL VMS')
+    };
+    pluralCaseCommon(t, rule1raw, VMS[0].uuid, 0);
+});
+
+test('pluralToDeletable', function (t)
+{
+
+    var rule1raw = {
+        description: 'Plural TO Deletable',
         enabled: true,
         owner_uuid: OWNERS[0],
         rule: util.format(
@@ -532,13 +484,27 @@ exports.pluralToDeletable = function (t)
                 all_vm_list(4), two_vm_list(0, 8))
     };
     pluralCaseCommon(t, rule1raw, VMS[0].uuid, 1);
-};
+});
 
-exports.pluralFromNotDeletable = function (t)
+test('pluralToAllDeletable', function (t)
 {
 
     var rule1raw = {
-        description: 'Plural FROM',
+        description: 'Plural TO All Deletable',
+        enabled: true,
+        owner_uuid: OWNERS[0],
+        rule: util.format(
+                'FROM %s TO %s ALLOW tcp PORT 22',
+                two_vm_list(0, 8), 'ALL VMS')
+    };
+    pluralCaseCommon(t, rule1raw, VMS[0].uuid, 1);
+});
+
+test('pluralFromNotDeletable', function (t)
+{
+
+    var rule1raw = {
+        description: 'Plural FROM Not Deletable',
         enabled: true,
         owner_uuid: OWNERS[0],
         rule: util.format(
@@ -546,13 +512,27 @@ exports.pluralFromNotDeletable = function (t)
                 two_vm_list(2, 3), all_vm_list(4))
     };
     pluralCaseCommon(t, rule1raw, VMS[2].uuid, 0);
-};
+});
 
-exports.pluralFromDeletable = function (t)
+test('pluralFromAllNotDeletable', function (t)
 {
 
     var rule1raw = {
-        description: 'Plural FROM',
+        description: 'Plural FROM All Not Deletable',
+        enabled: true,
+        owner_uuid: OWNERS[0],
+        rule: util.format(
+                'FROM %s TO %s ALLOW tcp PORT 22',
+                two_vm_list(2, 3), 'ALL VMS')
+    };
+    pluralCaseCommon(t, rule1raw, VMS[2].uuid, 0);
+});
+
+test('pluralFromDeletable', function (t)
+{
+
+    var rule1raw = {
+        description: 'Plural FROM Deletable',
         enabled: true,
         owner_uuid: OWNERS[0],
         rule: util.format(
@@ -560,16 +540,29 @@ exports.pluralFromDeletable = function (t)
                 two_vm_list(2, 8), all_vm_list(4))
     };
     pluralCaseCommon(t, rule1raw, VMS[2].uuid, 1);
-};
+});
+
+test('pluralFromAllDeletable', function (t)
+{
+    var rule1raw = {
+        description: 'Plural FROM All Deletable',
+        enabled: true,
+        owner_uuid: OWNERS[0],
+        rule: util.format(
+                'FROM %s TO %s ALLOW tcp PORT 22',
+                two_vm_list(2, 8), 'ALL VMS')
+    };
+    pluralCaseCommon(t, rule1raw, VMS[2].uuid, 1);
+});
 
 /*
  * We try this on a rule where the VM-lists are the same length (2). Target is
  * in FROM.
  */
-exports.smallPluralFromNotDeletable = function (t)
+test('smallPluralFromNotDeletable', function (t)
 {
     var rule1raw = {
-        description: 'Small Plural FROM',
+        description: 'Small Plural FROM Not Deletable',
         enabled: true,
         owner_uuid: OWNERS[0],
         rule: util.format(
@@ -578,12 +571,12 @@ exports.smallPluralFromNotDeletable = function (t)
     };
 
     pluralCaseCommon(t, rule1raw, VMS[4].uuid, 0);
-};
+});
 
-exports.smallPluralFromDeletable = function (t)
+test('smallPluralFromDeletable', function (t)
 {
     var rule1raw = {
-        description: 'Small Plural FROM',
+        description: 'Small Plural FROM Deletable',
         enabled: true,
         owner_uuid: OWNERS[0],
         rule: util.format(
@@ -592,16 +585,16 @@ exports.smallPluralFromDeletable = function (t)
     };
 
     pluralCaseCommon(t, rule1raw, VMS[4].uuid, 1);
-};
+});
 
 /*
  * We try this on a rule where the VM-lists are the same length (2). Target is
  * in TO.
  */
-exports.smallPluralToNotDeletable = function (t)
+test('smallPluralToNotDeletable', function (t)
 {
     var rule1raw = {
-        description: 'Small Plural TO',
+        description: 'Small Plural TO Not Deletable',
         enabled: true,
         owner_uuid: OWNERS[0],
         rule: util.format(
@@ -610,12 +603,12 @@ exports.smallPluralToNotDeletable = function (t)
     };
 
     pluralCaseCommon(t, rule1raw, VMS[6].uuid, 0);
-};
+});
 
-exports.smallPluralToDeletable = function (t)
+test('smallPluralToDeletable', function (t)
 {
     var rule1raw = {
-        description: 'Small Plural TO',
+        description: 'Small Plural TO Deletable',
         enabled: true,
         owner_uuid: OWNERS[0],
         rule: util.format(
@@ -624,48 +617,19 @@ exports.smallPluralToDeletable = function (t)
     };
 
     pluralCaseCommon(t, rule1raw, VMS[6].uuid, 1);
-};
+});
 
 /*
  * We want to destroy any remaining VMs.
  */
-exports.teardown = function (t)
+test('teardown', function (t)
 {
     mod_vm.delAllCreated(t, function (err, res) {
         if (err) {
             t.ok(err === null, 'Should not have errors when destroying VMs.');
-            t.done();
+            t.end();
             return;
         }
-        t.done();
+        t.end();
     });
-};
-
-module.exports = {
-    setup: exports.setup,
-
-    sleep: exports.sleep,
-
-    singularFrom: exports.singularFrom,
-    singularTo: exports.singularTo,
-    singularFromAny: exports.singularFromAny,
-    singularToAny: exports.singularToAny,
-    singularFromAnyToAll: exports.singularFromAnyToAll,
-    singularFromAll: exports.singularFromAll,
-    singularToAll: exports.singularToAll,
-    singularFromAllToAny: exports.singularFromAllToAny,
-    singularFromTag: exports.singularFromTag,
-    singularToTag: exports.singularToTag,
-
-    pluralToNotDeletable: exports.pluralToNotDeletable,
-    pluralFromNotDeletable: exports.pluralFromNotDeletable,
-    smallPluralToNotDeletable: exports.smallPluralToNotDeletable,
-    smallPluralFromNotDeletable: exports.smallPluralFromNotDeletable,
-
-    pluralToDeletable: exports.pluralToDeletable,
-    pluralFromDeletable: exports.pluralFromDeletable,
-    smallPluralToDeletable: exports.smallPluralToDeletable,
-    smallPluralFromDeletable: exports.smallPluralFromDeletable,
-
-    teardown: exports.teardown
-};
+});

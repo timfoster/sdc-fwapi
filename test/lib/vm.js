@@ -251,6 +251,13 @@ function delOne(t, opts, callback) {
     });
 }
 
+function get(t, opts, callback)
+{
+    var client = opts.client || mod_client.get('vmapi');
+
+    client.getVm(opts, callback);
+}
+
 /**
  * Delete a single VM, just like delOne. However it does not poll the VM's
  * state recursively. Which seems to be the source of much slowness.
@@ -405,5 +412,6 @@ module.exports = {
     provision: provision,
     update: update,
     delOne: delOne,
-    delOneNoPoll: delOneNoPoll
+    delOneNoPoll: delOneNoPoll,
+    get: get
 };
