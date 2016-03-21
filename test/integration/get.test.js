@@ -87,6 +87,77 @@ test('get: owner rule with wrong owner_uuid', function (t) {
     });
 });
 
+test('get: owner rule with misformatted uuid', function (t) {
+    mod_rule.list(t, {
+        params: {
+            owner_uuid: 'not-a-uuid'
+        },
+        expCode: 422,
+        expErr: {
+            code: 'InvalidParameters',
+            message: 'Invalid parameters',
+            errors: [ {
+                field: 'owner_uuid',
+                code: 'InvalidParameter',
+                message: 'Invalid Owner UUID'
+            } ]
+        }
+    });
+});
+
+test('get: ip rule with misformatted ip', function (t) {
+    mod_rule.list(t, {
+        params: {
+            ip: 'not-an-ip'
+        },
+        expCode: 422,
+        expErr: {
+            code: 'InvalidParameters',
+            message: 'Invalid parameters',
+            errors: [ {
+                field: 'ip',
+                code: 'InvalidParameter',
+                message: 'Invalid IP Addr'
+            } ]
+        }
+    });
+});
+
+test('get: vm rule with misformatted vm', function (t) {
+    mod_rule.list(t, {
+        params: {
+            vm: 'not-a-vm'
+        },
+        expCode: 422,
+        expErr: {
+            code: 'InvalidParameters',
+            message: 'Invalid parameters',
+            errors: [ {
+                field: 'vm',
+                code: 'InvalidParameter',
+                message: 'Invalid VM'
+            } ]
+        }
+    });
+});
+
+test('get: subnet rule with misformatted subnet', function (t) {
+    mod_rule.list(t, {
+        params: {
+            subnet: 'not-a-subnet'
+        },
+        expCode: 422,
+        expErr: {
+            code: 'InvalidParameters',
+            message: 'Invalid parameters',
+            errors: [ {
+                field: 'subnet',
+                code: 'InvalidParameter',
+                message: 'Invalid Subnet'
+            } ]
+        }
+    });
+});
 
 test('get: global rule with no params', function (t) {
     mod_rule.get(t, {
