@@ -14,7 +14,9 @@
 
 var test = require('tape');
 var mod_rule = require('../lib/rule');
+var mod_vm = require('../lib/vm');
 var mod_uuid = require('node-uuid');
+var mod_vasync = require('vasync');
 
 
 
@@ -26,24 +28,103 @@ var OWNERS = [
     mod_uuid.v4(),
     mod_uuid.v4()
 ];
-var RULES = [
-    {
-        enabled: true,
-        owner_uuid: OWNERS[0],
-        rule: 'FROM any TO all vms ALLOW tcp PORT 5000'
-    },
-    {
-        enabled: true,
-        owner_uuid: OWNERS[1],
-        rule: 'FROM (tag foo = bar OR tag foo = baz) '
-            + 'TO tag side = two ALLOW tcp (PORT 5003 AND PORT 5004)'
-    },
-    {
-        enabled: true,
-        global: true,
-        rule: 'FROM any TO tag foo = baz ALLOW tcp PORT 5010'
-    }
+
+var VM_ALIASES = [
+    'vmapi0',
+    'fwapi0',
+    'cnapi0',
+    'napi0'
 ];
+
+var VM_UUIDS = [];
+var RULES = [];
+
+function
+alias2uuid(vm_alias, cb)
+{
+    console.log('alias2uuid entry');
+    mod_vm.list({ alias: vm_alias }, function (err, res) {
+        if (err) {
+            console.log('alias2uuid ERROR');
+            /* XXX handle this */
+            return;
+        }
+        console.log('alias2uuid FOREACH');
+        res.forEach(function (vm) {
+            console.log('alias2uuid PUSH');
+            console.log(vm);
+            VM_UUIDS.push(vm.uuid);
+            console.log(VM_UUIDS);
+        });
+        cb(err, res);
+        console.log('alias2uuid EXIT');
+    });
+}
+
+test('get service zone uuids', function (t) {
+    console.log('BEGIN VM PIPELINE');
+    mod_vasync.forEachPipeline({
+        'func': alias2uuid,
+        'inputs': VM_ALIASES
+    }, function (err, res) {
+        console.log('END VM PIPELINE');
+        console.log(res);
+        t.end();
+    });
+});
+
+test('Create Rules', function (t) {
+    RULES = [
+        {
+            enabled: true,
+            owner_uuid: OWNERS[0],
+            rule: 'FROM any TO all vms ALLOW tcp PORT 5000'
+        },
+        {
+            enabled: true,
+            owner_uuid: OWNERS[1],
+            rule: 'FROM (tag foo = bar OR tag foo = baz) '
+                + 'TO tag side = two ALLOW tcp (PORT 5003 AND PORT 5004)'
+        },
+        {
+            enabled: true,
+            global: true,
+            rule: 'FROM any TO tag foo = baz ALLOW tcp PORT 5010'
+        },
+        /* IP rule, VM rule, subnet rule */
+        {
+            enabled: true,
+            global: true,
+            rule: 'FROM ip 8.8.8.8 TO tag foo = baz ALLOW tcp PORT 5010'
+        },
+        {
+            enabled: true,
+            global: true,
+            rule: 'FROM ip 4.4.4.4 TO tag foo = baz ALLOW tcp PORT 5010'
+        },
+        {
+            enabled: true,
+            global: true,
+            rule: 'FROM subnet 10.8.0.0/16 TO tag foo = baz ALLOW tcp PORT 5010'
+        },
+        {
+            enabled: true,
+            global: true,
+            rule: 'FROM subnet 10.7.0.0/16 TO tag foo = baz ALLOW tcp PORT 5010'
+        },
+        {
+            enabled: true,
+            global: true,
+            rule: 'FROM vm ' + VM_UUIDS[0] + ' TO tag foo = baz ALLOW tcp PORT 5010'
+        },
+        {
+            enabled: true,
+            global: true,
+            rule: 'FROM vm ' + VM_UUIDS[1] + ' TO tag foo = baz ALLOW tcp PORT 5010'
+        }
+    ];
+    t.end();
+});
 
 
 // --- Tests
@@ -123,6 +204,28 @@ test('get: ip rule with misformatted ip', function (t) {
     });
 });
 
+function
+print_res(t, err, res)
+{
+    console.log('RES:');
+    console.log(res);
+    t.end();
+}
+
+test('get: ip rule with valid ip', function (t) {
+    mod_rule.list(t, {
+        params: { ip: '8.8.8.8' },
+        expCode: 200
+    }, print_res.bind(null, t));
+});
+
+test('get: ip rule with valid ips', function (t) {
+    mod_rule.list(t, {
+        params: { ip: ['8.8.8.8', '4.4.4.4'] },
+        expCode: 200
+    }, print_res.bind(null, t));
+});
+
 test('get: vm rule with misformatted vm', function (t) {
     mod_rule.list(t, {
         params: {
@@ -141,6 +244,20 @@ test('get: vm rule with misformatted vm', function (t) {
     });
 });
 
+test('get: vm rule with valid vm', function (t) {
+    mod_rule.list(t, {
+        params: { vm: VM_UUIDS[0] },
+        expCode: 200
+    }, print_res.bind(null, t));
+});
+
+test('get: vm rule with valid vms', function (t) {
+    mod_rule.list(t, {
+        params: { vm: [VM_UUIDS[0], VM_UUIDS[1]] },
+        expCode: 200
+    }, print_res.bind(null, t));
+});
+
 test('get: subnet rule with misformatted subnet', function (t) {
     mod_rule.list(t, {
         params: {
@@ -157,6 +274,20 @@ test('get: subnet rule with misformatted subnet', function (t) {
             } ]
         }
     });
+});
+
+test('get: subnet rule with valid subnet', function (t) {
+    mod_rule.list(t, {
+        params: { subnet: '10.8.0.0/16' },
+        expCode: 200
+    }, print_res.bind(null, t));
+});
+
+test('get: subnet rule with valid subnets', function (t) {
+    mod_rule.list(t, {
+        params: { subnet: [ '10.8.0.0/16', '10.7.0.0/16'] },
+        expCode: 200
+    }, print_res.bind(null, t));
 });
 
 test('get: global rule with no params', function (t) {

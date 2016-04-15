@@ -373,10 +373,25 @@ function update(t, opts, callback) {
     });
 }
 
+function
+get(params, cb)
+{
+    var client = mod_client.get('vmapi');
+    client.getVm(params, cb);
+}
+
+function
+list(params, cb)
+{
+    var client = mod_client.get('vmapi');
+    client.listVms(params, cb);
+}
 
 module.exports = {
     alias: alias,
     del: del,
+    get: get,
+    list: list,
     delAllCreated: delAllCreated,
     provision: provision,
     update: update
