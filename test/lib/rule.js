@@ -314,6 +314,8 @@ function get(t, opts, callback) {
                 var code = opts.expCode || 422;
                 t.equal(err.statusCode, code, 'status code');
                 t.deepEqual(err.body, opts.expErr, 'error body');
+                /* If this rule does not exist, it should not be in RULES */
+                delete RULES[opts.uuid];
             }
 
             if (obj && obj.rule) {

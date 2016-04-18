@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright (c) 2014, Joyent, Inc.
+ * Copyright (c) 2016, Joyent, Inc.
  */
 
 /*
@@ -32,9 +32,7 @@ var delVMS = [];
 var NVM = 9;
 
 /*
- * Create NVM number of VMs. Use them for our evil experiments. We use mod_vm's
- * provision() function which takes an array of VM configs as an option, and
- * uses those to create the VMs just how we like them.
+ * Create NVM number of VMs. Use them for our evil experiments.
  */
 test('setup', function (t)
 {
@@ -120,7 +118,7 @@ test('sleep', function (t)
                     setTimeout(checkState, 1000);
                 }
             });
-        }
+        };
         setTimeout(checkState, 1000);
     });
 });
@@ -181,7 +179,7 @@ function two_vm_list(a, b)
     return (ret);
 }
 
-var singularCommon = function (t, rule_raw, deletable)
+function singularCommon(t, rule_raw, deletable)
 {
     var expErr = {
         code: 'ResourceNotFound',
@@ -208,7 +206,8 @@ var singularCommon = function (t, rule_raw, deletable)
             }, function (err2, res2) {
                 var del_vm_args;
                 if (deletable) {
-                    del_vm_args = {uuid: rule.uuid, expErr: expErr, expCode: 404};
+                    del_vm_args = {uuid: rule.uuid, expErr: expErr,
+                        expCode: 404};
                 } else {
                     del_vm_args = {uuid: rule.uuid};
                 }
@@ -223,7 +222,7 @@ var singularCommon = function (t, rule_raw, deletable)
                         mod_rule.get(t, {uuid: rule.uuid, expErr: expErr,
                             expCode: 404}, function (err4, res4) {
                             /*
-                             * This get-request should also return an error.
+                             * This GET should also return an error.
                              */
                             t.ok(err4 !== null, 'err4 !== null');
                             t.end();
@@ -245,7 +244,7 @@ var singularCommon = function (t, rule_raw, deletable)
     mod_rule.create(t, {rule: rule_raw}, rule_create_cb);
 
     return (t);
-};
+}
 
 test('singularFrom', function (t)
 {
@@ -446,7 +445,6 @@ var pluralCaseCommon = function (t, rule1raw, targ_uuid, deletable)
 
 test('pluralToNotDeletable', function (t)
 {
-
     var rule1raw = {
         description: 'Plural TO Not Deletable',
         enabled: true,
@@ -460,7 +458,6 @@ test('pluralToNotDeletable', function (t)
 
 test('pluralToAllNotDeletable', function (t)
 {
-
     var rule1raw = {
         description: 'Plural TO All Not Deletable',
         enabled: true,
@@ -474,7 +471,6 @@ test('pluralToAllNotDeletable', function (t)
 
 test('pluralToDeletable', function (t)
 {
-
     var rule1raw = {
         description: 'Plural TO Deletable',
         enabled: true,
@@ -488,7 +484,6 @@ test('pluralToDeletable', function (t)
 
 test('pluralToAllDeletable', function (t)
 {
-
     var rule1raw = {
         description: 'Plural TO All Deletable',
         enabled: true,
@@ -502,7 +497,6 @@ test('pluralToAllDeletable', function (t)
 
 test('pluralFromNotDeletable', function (t)
 {
-
     var rule1raw = {
         description: 'Plural FROM Not Deletable',
         enabled: true,
@@ -516,7 +510,6 @@ test('pluralFromNotDeletable', function (t)
 
 test('pluralFromAllNotDeletable', function (t)
 {
-
     var rule1raw = {
         description: 'Plural FROM All Not Deletable',
         enabled: true,
@@ -530,7 +523,6 @@ test('pluralFromAllNotDeletable', function (t)
 
 test('pluralFromDeletable', function (t)
 {
-
     var rule1raw = {
         description: 'Plural FROM Deletable',
         enabled: true,
@@ -619,10 +611,23 @@ test('smallPluralToDeletable', function (t)
     pluralCaseCommon(t, rule1raw, VMS[6].uuid, 1);
 });
 
+test('mixedUndeletable', function (t)
+{
+    var rule1raw = {
+        description: 'Mixed TO Undeletable',
+        enabled: true,
+        owner_uuid: OWNERS[0],
+        rule: util.format(
+                'FROM ip 8.8.8.8 TO %s ALLOW tcp PORT 22',
+                two_vm_list(5, 6))
+    };
+    pluralCaseCommon(t, rule1raw, VMS[6].uuid, 0);
+});
+
 /*
  * We want to destroy any remaining VMs.
  */
-test('teardown', function (t)
+test('teardown VMs', function (t)
 {
     mod_vm.delAllCreated(t, function (err, res) {
         if (err) {
@@ -630,6 +635,13 @@ test('teardown', function (t)
             t.end();
             return;
         }
+        t.end();
+    });
+});
+
+test('teardown Rules', function (t)
+{
+    mod_rule.delAllCreated(t, function (err, res) {
         t.end();
     });
 });
