@@ -115,12 +115,14 @@ test('Create Rules', function (t) {
         {
             enabled: true,
             global: true,
-            rule: 'FROM vm ' + VM_UUIDS[0] + ' TO tag foo = baz ALLOW tcp PORT 5010'
+            rule: 'FROM vm ' + VM_UUIDS[0] +
+                ' TO tag foo = baz ALLOW tcp PORT 5010'
         },
         {
             enabled: true,
             global: true,
-            rule: 'FROM vm ' + VM_UUIDS[1] + ' TO tag foo = baz ALLOW tcp PORT 5010'
+            rule: 'FROM vm ' + VM_UUIDS[1] +
+                ' TO tag foo = baz ALLOW tcp PORT 5010'
         }
     ];
     t.end();
@@ -205,25 +207,55 @@ test('get: ip rule with misformatted ip', function (t) {
 });
 
 function
-print_res(t, err, res)
+test_done(t, err, res)
 {
-    console.log('RES:');
-    console.log(res);
     t.end();
 }
+
+test('get: ip rule with non-string value', function (t) {
+    mod_rule.list(t, {
+        params: { ip: 42 },
+        expCode: 422,
+        expErr: {
+            code: 'InvalidParameters',
+            message: 'Invalid parameters',
+            errors: [ {
+                field: 'ip',
+                code: 'InvalidParameter',
+                message: 'Invalid IP Addr'
+            } ]
+        }
+    });
+});
+
+test('get: ip rule with non-string values', function (t) {
+    mod_rule.list(t, {
+        params: { ip: [42, {}] },
+        expCode: 422,
+        expErr: {
+            code: 'InvalidParameters',
+            message: 'Invalid parameters',
+            errors: [ {
+                field: 'ip',
+                code: 'InvalidParameter',
+                message: 'Invalid IP Addr'
+            } ]
+        }
+    });
+});
 
 test('get: ip rule with valid ip', function (t) {
     mod_rule.list(t, {
         params: { ip: '8.8.8.8' },
         expCode: 200
-    }, print_res.bind(null, t));
+    }, test_done.bind(null, t));
 });
 
 test('get: ip rule with valid ips', function (t) {
     mod_rule.list(t, {
         params: { ip: ['8.8.8.8', '4.4.4.4'] },
         expCode: 200
-    }, print_res.bind(null, t));
+    }, test_done.bind(null, t));
 });
 
 test('get: vm rule with misformatted vm', function (t) {
@@ -244,18 +276,50 @@ test('get: vm rule with misformatted vm', function (t) {
     });
 });
 
+test('get: vm rule with non-string value', function (t) {
+    mod_rule.list(t, {
+        params: { vm: 42 },
+        expCode: 422,
+        expErr: {
+            code: 'InvalidParameters',
+            message: 'Invalid parameters',
+            errors: [ {
+                field: 'vm',
+                code: 'InvalidParameter',
+                message: 'Invalid VM'
+            } ]
+        }
+    });
+});
+
+test('get: vm rule with non-string values', function (t) {
+    mod_rule.list(t, {
+        params: { vm: [42, {}] },
+        expCode: 422,
+        expErr: {
+            code: 'InvalidParameters',
+            message: 'Invalid parameters',
+            errors: [ {
+                field: 'vm',
+                code: 'InvalidParameter',
+                message: 'Invalid VM'
+            } ]
+        }
+    });
+});
+
 test('get: vm rule with valid vm', function (t) {
     mod_rule.list(t, {
         params: { vm: VM_UUIDS[0] },
         expCode: 200
-    }, print_res.bind(null, t));
+    }, test_done.bind(null, t));
 });
 
 test('get: vm rule with valid vms', function (t) {
     mod_rule.list(t, {
         params: { vm: [VM_UUIDS[0], VM_UUIDS[1]] },
         expCode: 200
-    }, print_res.bind(null, t));
+    }, test_done.bind(null, t));
 });
 
 test('get: subnet rule with misformatted subnet', function (t) {
@@ -276,18 +340,50 @@ test('get: subnet rule with misformatted subnet', function (t) {
     });
 });
 
+test('get: subnet rule with non-string value', function (t) {
+    mod_rule.list(t, {
+        params: { subnet: 42 },
+        expCode: 422,
+        expErr: {
+            code: 'InvalidParameters',
+            message: 'Invalid parameters',
+            errors: [ {
+                field: 'subnet',
+                code: 'InvalidParameter',
+                message: 'Invalid Subnet'
+            } ]
+        }
+    });
+});
+
+test('get: subnet rule with non-string values', function (t) {
+    mod_rule.list(t, {
+        params: { subnet: [42, {}] },
+        expCode: 422,
+        expErr: {
+            code: 'InvalidParameters',
+            message: 'Invalid parameters',
+            errors: [ {
+                field: 'subnet',
+                code: 'InvalidParameter',
+                message: 'Invalid Subnet'
+            } ]
+        }
+    });
+});
+
 test('get: subnet rule with valid subnet', function (t) {
     mod_rule.list(t, {
         params: { subnet: '10.8.0.0/16' },
         expCode: 200
-    }, print_res.bind(null, t));
+    }, test_done.bind(null, t));
 });
 
 test('get: subnet rule with valid subnets', function (t) {
     mod_rule.list(t, {
         params: { subnet: [ '10.8.0.0/16', '10.7.0.0/16'] },
         expCode: 200
-    }, print_res.bind(null, t));
+    }, test_done.bind(null, t));
 });
 
 test('get: global rule with no params', function (t) {
