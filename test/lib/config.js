@@ -12,28 +12,14 @@
  * Test helpers for dealing with the NAPI client
  */
 
+'use strict';
 
 var fs = require('fs');
 var path = require('path');
 var VError = require('verror').VError;
 
 
-
-// --- Internal
-
-
-
-function apiConfig(apiName) {
-    return {
-        agent: false,
-        url: config.test[apiName + '_url']
-    };
-}
-
-
-
-// --- Exports
-
+// --- Globals
 
 
 var CFG_ERR;
@@ -47,6 +33,21 @@ try {
     console.error('# Error loading test config %s: %s', testFile, err.message);
     config.test = {};
 }
+
+
+// --- Internal
+
+
+function apiConfig(apiName) {
+    return {
+        agent: false,
+        url: config.test[apiName + '_url']
+    };
+}
+
+
+// --- Exports
+
 
 config.fwapi = apiConfig('fwapi');
 config.napi = apiConfig('napi');

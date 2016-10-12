@@ -12,6 +12,8 @@
  * Test helpers for FWAPI integration tests
  */
 
+'use strict';
+
 var common = require('../lib/common');
 
 

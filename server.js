@@ -12,6 +12,8 @@
  * Main entry-point for the firewall API.
  */
 
+'use strict';
+
 var fwapi = require('./lib/app');
 var assert = require('assert-plus');
 var bunyan = require('bunyan');
