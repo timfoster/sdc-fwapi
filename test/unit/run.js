@@ -5,7 +5,8 @@
  */
 
 /*
- * Copyright 2014 Patrick Mooney.  All rights reserved.
+ * Copyright 2016, Joyent, Inc.
+ * Copyright 2014, Patrick Mooney.
  */
 
 'use strict';

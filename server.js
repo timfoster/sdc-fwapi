@@ -82,7 +82,11 @@ function main() {
         process.exit(1);
     }
 
-    server.listen(function () {
+    server.listen(function (lErr) {
+        if (lErr) {
+            throw lErr;
+        }
+
         var addr = server.info();
         log.info('%s listening on <http://%s:%s>',
             addr.name, addr.address, addr.port);
