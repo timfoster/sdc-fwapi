@@ -5,21 +5,24 @@
  */
 
 /*
- * Copyright (c) 2015, Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 /*
  * Helpers for manipulating FWAPI rules
  */
 
+'use strict';
+
 var assert = require('assert-plus');
-var async = require('async');
 var clone = require('clone');
 var common = require('./common');
 var done = common.done;
 var fmt = require('util').format;
 var ifErr = common.ifErr;
 var mod_client = require('./client');
+var mod_err = require('../../lib/errors');
+var mod_trunc = require('./trunc');
 var mod_uuid = require('node-uuid');
 var mod_log = require('./log');
 var mod_vasync = require('vasync');
@@ -30,11 +33,15 @@ var mod_vasync = require('vasync');
 
 
 
-var GLOBAL_RULES = [];
-var GLOBAL_RULES_RETRIEVED = false;
-var LOG = mod_log.child({ component: 'rule' });
+var COLUMNS = mod_trunc.COLUMNS;
+var LOG = mod_log.get().child({ component: 'rule' });
 var RULES = {};
 
+var ALREADY_EXISTS_ERR = {
+    code: 'RuleExistsError',
+    message: 'rule already exists',
+    errors: [ mod_err.duplicateParam('uuid') ]
+};
 
 
 // --- Internal
@@ -42,16 +49,11 @@ var RULES = {};
 
 
 function getGlobalRules(t, client, callback) {
-    if (GLOBAL_RULES_RETRIEVED) {
-        return callback(null, clone(GLOBAL_RULES));
-    }
-
     client.listRules({ global: true }, function (err, rules) {
         if (ifErr(t, err, 'listing global rules')) {
             return callback(err);
         }
 
-        GLOBAL_RULES = clone(rules);
         return callback(null, rules);
     });
 }
@@ -76,7 +78,12 @@ function create(t, opts, callback) {
     assert.optionalObject(opts.partialExp, 'opts.partialExp');
 
     var client = opts.client || mod_client.get('fwapi');
-    var desc = fmt(' (creating rule=%s)', opts.rule.rule);
+
+    var descFmt = ' (creating rule=%s)';
+    var descLen = descFmt.length - 2;
+    var desc = (opts.rule.rule.length + descLen > COLUMNS) ?
+        fmt(descFmt, opts.rule.rule.slice(0, COLUMNS - descLen - 3) + '...') :
+        fmt(descFmt, opts.rule.rule);
 
     LOG.debug({ rule: opts.rule }, 'creating rule');
     client.createRule(opts.rule, function (err, obj, req, res) {
@@ -210,7 +217,7 @@ function del(t, opts, callback) {
         t.ok(updateID, 'x-update-id: ' + updateID + desc);
 
         t.equal(res.statusCode, 204, 'status code' + desc);
-        delete RULES[obj.uuid];
+        delete RULES[opts.uuid];
 
         return done(null, obj, t, callback);
     });
@@ -223,20 +230,24 @@ function del(t, opts, callback) {
 function delAllCreated(t, callback) {
     var toDel = Object.keys(RULES);
     if (toDel.length === 0) {
-        return done(null, toDel, t, callback);
+        done(null, toDel, t, callback);
+        return;
     }
 
     LOG.debug({ toDel: toDel }, 'deleting all created rules');
 
-    async.forEachSeries(toDel, function (uuid, cb) {
-        delAndGet(t, {
-            uuid: uuid
-        }, function () {
-            // Ignore the error and plow on
-            return cb();
-        });
+    mod_vasync.forEachPipeline({
+        inputs: toDel,
+        func: function doDel(uuid, cb) {
+            delAndGet(t, {
+                uuid: uuid
+            }, function (_) {
+                // Ignore the error and plow on
+                cb(null);
+            });
+        }
     }, function (err) {
-        return done(err, toDel, t, callback);
+        done(err, toDel, t, callback);
     });
 }
 
@@ -246,13 +257,18 @@ function delAllCreated(t, callback) {
  */
 function delAndGet(t, opts, callback) {
     del(t, opts, function (err, res) {
+        if (ifErr(t, err, 'Failed to delete rule')) {
+            callback(err);
+            return;
+        }
+
         opts.expErr = {
             code: 'ResourceNotFound',
             message: 'Rule not found'
         };
         opts.expCode = 404;
 
-        return get(t, opts, callback);
+        get(t, opts, callback);
     });
 }
 
@@ -349,7 +365,9 @@ function listRules(t, opts, callback) {
 
     var client = opts.client || mod_client.get('fwapi');
     var params = opts.params || {};
-    var desc = fmt(' (params=%s)', JSON.stringify(params));
+    var descFmt = ' (params=%s)';
+    var descLen = descFmt.length - 2;
+    var desc = fmt(descFmt, mod_trunc.obj(params, COLUMNS - descLen));
 
     client.listRules(params, function (err, obj, req, res) {
         if (opts.expErr) {
@@ -391,12 +409,15 @@ function resolve(t, opts, callback) {
     assert.optionalObject(opts.expErr, 'opts.expErr');
 
     var client = opts.client || mod_client.get('fwapi');
+    var descFmt = ' (resolve: params=%s)';
+    var descLen = descFmt.length - 2;
     var desc = opts.desc ||
-        fmt(' (resolve: params=%s)', JSON.stringify(opts.params));
+        fmt(descFmt, mod_trunc.obj(opts.params, COLUMNS - descLen));
 
     getGlobalRules(t, client, function (gErr, globalRules) {
         if (gErr) {
-            return done(gErr, null, t, callback);
+            done(gErr, null, t, callback);
+            return;
         }
 
         var postParams = {
@@ -450,15 +471,25 @@ function update(t, opts, callback) {
     assert.optionalFunc(callback, 'callback');
 
     assert.object(opts.params, 'opts.params');
-    assert.string(opts.uuid, 'opts.uuid');
+    assert.uuid(opts.uuid, 'opts.uuid');
     assert.optionalObject(opts.exp, 'opts.exp');
     assert.optionalObject(opts.expErr, 'opts.expErr');
     assert.optionalObject(opts.partialExp, 'opts.partialExp');
     assert.optionalObject(opts.rule, 'opts.rule');
 
     var client = opts.client || mod_client.get('fwapi');
-    var desc = fmt(' (params=%s, uuid=%s)', JSON.stringify(opts.params),
-        opts.uuid);
+
+    var descFmt = ' (params=%s, uuid=%s)';
+    var descLen = descFmt.length - 4;
+    var tparams = JSON.stringify(opts.params);
+    var tuuid = opts.uuid;
+
+    if (tparams.length + tuuid.length + descLen > COLUMNS) {
+        tuuid = mod_trunc.uuid(tuuid);
+        tparams = mod_trunc.obj(opts.params, COLUMNS - descLen - tuuid.length);
+    }
+
+    var desc = fmt(descFmt, tparams, tuuid);
 
     t.ok(opts.uuid, 'update' + desc);
     LOG.debug({ opts: opts }, 'updating rule');
@@ -551,7 +582,8 @@ function vmRules(t, opts, callback) {
 
     getGlobalRules(t, client, function (gErr, globalRules) {
         if (gErr) {
-            return done(gErr, null, t, callback);
+            done(gErr, null, t, callback);
+            return;
         }
 
         client.getVMrules(opts.uuid, {}, function (err, obj, req, res) {
@@ -586,6 +618,9 @@ function vmRules(t, opts, callback) {
 
 
 module.exports = {
+    get alreadyExistsErr() {
+        return clone(ALREADY_EXISTS_ERR);
+    },
     get _rules() {
         return RULES;
     },

@@ -5,12 +5,14 @@
  */
 
 /*
- * Copyright (c) 2014, Joyent, Inc.
+ * Copyright 2016, Joyent, Inc.
  */
 
 /*
  * CN interaction helpers
  */
+
+'use strict';
 
 var assert = require('assert-plus');
 var clone = require('clone');
@@ -20,8 +22,10 @@ var done = common.done;
 var ifErr = common.ifErr;
 var fmt = require('util').format;
 var mod_client = require('./client');
+var mod_jsprim = require('jsprim');
 var mod_log = require('./log');
 var restify = require('restify');
+var vasync = require('vasync');
 var VError = require('verror').VError;
 
 
@@ -31,7 +35,7 @@ var VError = require('verror').VError;
 
 
 var ADMIN_IPS = {};
-var LOG = mod_log.child({ component: 'cn' });
+var LOG = mod_log.get().child({ component: 'cn' });
 var NOT_FOUND_ERR = {
     code: 'ResourceNotFound',
     message: 'rule not found'
@@ -65,36 +69,34 @@ function checkUrl(t, opts, callback) {
 
     getClient(t, opts.server_uuid, function (err, client) {
         if (err) {
-            return callback(err);
+            callback(err);
+            return;
         }
 
         var start = Date.now();
-        /*jsl:ignore*/
-        var timeout;
-        /*jsl:end*/
 
         function checkIt() {
             client.get(opts.url, function (err2, req, res, obj) {
                 var elapsed = Date.now() - start;
 
-                if (err2 && err2.body && err2.body.code == opts.errCode &&
+                if (err2 && err2.body && err2.body.code === opts.errCode &&
                     (elapsed < POLL_TIMEOUT)) {
 
                     // We haven't hit our timeout yet, so keep trying
                     LOG.trace({ start: start.toString(), elapsed: elapsed },
                         'timeout not hit: retrying' + opts.desc);
-                    timeout = setTimeout(checkIt, POLL_INTERVAL);
+                    setTimeout(checkIt, POLL_INTERVAL);
                     return;
                 }
 
                 LOG.debug({ start: start.toString(), elapsed: elapsed },
                     'poll timeout exceeded' + opts.desc);
 
-                return callback(err2, req, res, obj);
+                callback(err2, req, res, obj);
             });
         }
 
-        timeout = setTimeout(checkIt, POLL_INTERVAL);
+        setTimeout(checkIt, POLL_INTERVAL);
     });
 }
 
@@ -130,7 +132,7 @@ function createRemoteVM(vm) {
         });
     }
 
-    if (objEmpty(ips)) {
+    if (mod_jsprim.isEmpty(ips)) {
         err = new VError(
             'Remote VM "%s": missing IPs', uuid);
         err.details = vm;
@@ -139,7 +141,7 @@ function createRemoteVM(vm) {
 
     rvm.ips = Object.keys(ips).sort();
 
-    if (vm.hasOwnProperty('tags') && !objEmpty(vm.tags)) {
+    if (mod_jsprim.hasKey(vm, 'tags') && !mod_jsprim.isEmpty(vm.tags)) {
         rvm.tags = {};
         for (var t in vm.tags) {
             rvm.tags[t] = vm.tags[t];
@@ -160,7 +162,8 @@ function createRemoteVM(vm) {
  */
 function getAdminIP(t, uuid, callback) {
     if (ADMIN_IPS.hasOwnProperty(uuid)) {
-        return callback(null, ADMIN_IPS[uuid]);
+        callback(null, ADMIN_IPS[uuid]);
+        return;
     }
 
     var napi = mod_client.get('napi');
@@ -195,26 +198,82 @@ function getClient(t, server, callback) {
 }
 
 
-/**
- * Returns true if the object has no keys
- * (stolen from fw/lib/util/vm.js)
- */
-function objEmpty(obj) {
-    /* JSSTYLED */
-    /*jsl:ignore*/
-    for (var k in obj) {
-        return false;
-    }
-    /* JSSTYLED */
-    /*jsl:end*/
+function checkTask(t, server, updateUUID, callback) {
+    getClient(t, server, function (err, client) {
+        if (err) {
+            callback(err);
+            return;
+        }
 
-    return true;
+        var start = Date.now();
+
+        function checkIt() {
+            client.get('/status', function (err2, req, res, obj) {
+                var elapsed = Date.now() - start;
+
+                if (err2 || obj.recent.indexOf(updateUUID) !== -1) {
+                    callback(err2);
+                    return;
+                }
+
+                /*
+                 * The 'sync' task does a lot more work than the other
+                 * endpoints, so we wait thrice as long before timing
+                 * out.
+                 */
+                if (elapsed < (POLL_TIMEOUT * 3)) {
+                    // We haven't hit our timeout yet, so keep trying
+                    LOG.trace({ start: start.toString(), elapsed: elapsed },
+                        'task poll timeout not hit: retrying');
+                    setTimeout(checkIt, POLL_INTERVAL);
+                    return;
+                }
+
+                LOG.debug({ start: start.toString(), elapsed: elapsed },
+                    'task poll timeout exceeded');
+
+                callback(new VError(
+                    'Task %s not executed within expected period', updateUUID));
+            });
+        }
+
+        setTimeout(checkIt, POLL_INTERVAL);
+    });
 }
-
 
 
 // --- Exports
 
+
+/**
+ * Run the 'sync' task on all CNs' firewallers, and make sure it finishes
+ * successfully on all CNs listed in the cns array.
+ */
+function syncAllCNs(t, cns, callback) {
+    assert.object(t, 't');
+    assert.arrayOfUuid(cns, 'cns');
+    assert.optionalFunc(callback, 'callback');
+
+    var fwapi = mod_client.get('fwapi');
+    fwapi.createUpdate({ type: 'sync' }, function (err, res) {
+        if (ifErr(t, err, 'sent sync message to FWAPI')) {
+            done(err, null, t, callback);
+            return;
+        }
+
+        var updateUUID = res.update_uuid;
+
+        vasync.forEachParallel({
+            inputs: cns,
+            func: function checkCN(cn, cb) {
+                checkTask(t, cn, updateUUID, cb);
+            }
+        }, function (err2) {
+            t.ifError(err2, 'all CNs should sync successfully');
+            done(err2, null, t, callback);
+        });
+    });
+}
 
 
 /**
@@ -395,6 +454,7 @@ module.exports = {
     getFwStatus: getFwStatus,
     getRule: getRule,
     getRVM: getRVM,
+    syncAll: syncAllCNs,
     get notFoundErr() {
         return clone(NOT_FOUND_ERR);
     },
