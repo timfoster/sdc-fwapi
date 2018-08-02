@@ -5,13 +5,14 @@
 #
 
 #
-# Copyright 2017, Joyent, Inc.
+# Copyright 2018, Joyent, Inc.
 #
 
 #
 # FWAPI Makefile
 #
 
+NAME = fwapi
 
 #
 # Tools
@@ -40,25 +41,34 @@ JSSTYLE_FLAGS    = -o indent=2,doxygen,unparenthesized-return=0,strict-indent=tr
 SMF_MANIFESTS_IN = smf/manifests/fwapi.xml.in
 
 
-include ./tools/mk/Makefile.defs
+# XXX timf comment out during eng development
+#REQUIRE_ENG := $(shell git submodule update --init deps/eng)
+include ./deps/eng/tools/mk/Makefile.defs
 ifeq ($(shell uname -s),SunOS)
 	# Allow building on a SmartOS image other than sdc-*-multiarch 15.4.1.
 	NODE_PREBUILT_IMAGE=18b094b0-eb01-11e5-80c1-175dac7ddf02
 	NODE_PREBUILT_VERSION=v0.10.48
 	NODE_PREBUILT_TAG=zone
-	include ./tools/mk/Makefile.node_prebuilt.defs
+	include ./deps/eng/tools/mk/Makefile.node_prebuilt.defs
+	include ./deps/eng/tools/mk/Makefile.agent_prebuilt.defs
 else
 	NPM_EXEC :=
 	NPM = npm
 endif
-include ./tools/mk/Makefile.smf.defs
+include ./deps/eng/tools/mk/Makefile.smf.defs
 
 
 TOP             := $(shell pwd)
-RELEASE_TARBALL := fwapi-pkg-$(STAMP).tar.bz2
+RELEASE_TARBALL := $(NAME)-pkg-$(STAMP).tar.bz2
 PKGDIR          := $(TOP)/$(BUILD)/pkg
 INSTDIR         := $(PKGDIR)/root/opt/smartdc/fwapi
 
+BASE_IMAGE_UUID = 04a48d7d-6bb5-4e83-8c3b-e60a99e0f48f
+BUILDIMAGE_NAME = $(NAME)
+BUILDIMAGE_DESC	= SDC FWAPI
+BUILDIMAGE_PKG	= $(PWD)/$(RELEASE_TARBALL)
+BUILDIMAGE_STAGEDIR = /tmp/buildimage-$(NAME)-$(STAMP)
+AGENTS		= amon config registrar
 
 #
 # Repo-specific targets
@@ -67,7 +77,8 @@ INSTDIR         := $(PKGDIR)/root/opt/smartdc/fwapi
 all: $(SMF_MANIFESTS) | $(NPM_EXEC) $(REPO_DEPS) sdc-scripts
 	$(NPM) install --production
 
-$(ESLINT): | $(NPM_EXEC)
+.PHONY: eslint-npm
+eslint-npm: | $(NPM_EXEC)
 	$(NPM) install \
 	    eslint@`json -f package.json devDependencies.eslint` \
 	    eslint-plugin-joyent@`json -f package.json devDependencies.eslint-plugin-joyent`
@@ -108,7 +119,11 @@ docs/examples.md: node_modules/fwrule/docs/examples.md
 	$(TOP)/tools/restdown-header "Firewall API Examples" > docs/examples.md
 	cat node_modules/fwrule/docs/examples.md >> docs/examples.md
 
-CLEAN_FILES += ./node_modules $(BUILD)/docs docs/examples.md docs/rules.md
+CLEAN_FILES += ./node_modules \
+	$(BUILD)/docs \
+	docs/examples.md \
+	docs/rules.md \
+	$(NAME)-pkg-.*.tar.bz2
 
 
 #
@@ -168,20 +183,20 @@ publish: release
 
 
 .PHONY: check
-check:: $(ESLINT)
+check:: $(ESLINT) eslint-npm
 	$(ESLINT) -c $(ESLINT_CONF) $(ESLINT_FILES)
-
 
 #
 # Includes
 #
-include ./tools/mk/Makefile.deps
+include ./deps/eng/tools/mk/Makefile.deps
 ifeq ($(shell uname -s),SunOS)
-	include ./tools/mk/Makefile.node_prebuilt.targ
+	include ./deps/eng/tools/mk/Makefile.node_prebuilt.targ
+	include ./deps/eng/tools/mk/Makefile.agent_prebuilt.targ
 else
-	include ./tools/mk/Makefile.node.targ
+	include ./deps/eng/tools/mk/Makefile.node.targ
 endif
-include ./tools/mk/Makefile.smf.targ
-include ./tools/mk/Makefile.targ
+include ./deps/eng/tools/mk/Makefile.smf.targ
+include ./deps/eng/tools/mk/Makefile.targ
 
 sdc-scripts: deps/sdc-scripts/.git
