@@ -1,6 +1,7 @@
 /coverage
 /node_modules
 /tmp
+bits
 build
 docs/examples.md
 docs/rules.md
