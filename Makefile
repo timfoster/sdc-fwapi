@@ -59,7 +59,7 @@ include ./deps/eng/tools/mk/Makefile.smf.defs
 
 
 TOP             := $(shell pwd)
-RELEASE_TARBALL := $(NAME)-pkg-$(STAMP).tar.bz2
+RELEASE_TARBALL := $(NAME)-pkg-$(STAMP).tar.gz
 PKGDIR          := $(TOP)/$(BUILD)/pkg
 INSTDIR         := $(PKGDIR)/root/opt/smartdc/fwapi
 
@@ -121,8 +121,7 @@ docs/examples.md: node_modules/fwrule/docs/examples.md
 CLEAN_FILES += ./node_modules \
 	$(BUILD)/docs \
 	docs/examples.md \
-	docs/rules.md \
-	$(NAME)-pkg-.*.tar.bz2
+	docs/rules.md
 
 
 #
@@ -169,7 +168,7 @@ pkg: all $(SMF_MANIFESTS)
 	rm -rf $(INSTDIR)/node_modules/jison	# we don't need to regenerate the parser
 
 $(RELEASE_TARBALL): pkg
-	(cd $(PKGDIR) && $(TAR) -jcf $(TOP)/$(RELEASE_TARBALL) root site)
+	(cd $(PKGDIR) && $(TAR) -I pigz -cf $(TOP)/$(RELEASE_TARBALL) root site)
 
 .PHONY: publish
 publish: release
