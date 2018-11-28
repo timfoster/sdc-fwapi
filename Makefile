@@ -39,8 +39,9 @@ JSON_FILES	:= config.json.sample package.json
 JSSTYLE_FILES	 = $(JS_FILES)
 JSSTYLE_FLAGS    = -o indent=2,doxygen,unparenthesized-return=0,strict-indent=true
 SMF_MANIFESTS_IN = smf/manifests/fwapi.xml.in
-
-REQUIRE_ENG := $(shell git submodule update --init deps/eng)
+ 
+ENGBLD_USE_BUILDIMAGE	= true
+ENGBLD_REQUIRE		:= $(shell git submodule update --init deps/eng)
 include ./deps/eng/tools/mk/Makefile.defs
 TOP ?= $(error Unable to access eng.git submodule Makefiles.)
 
