@@ -14,5 +14,5 @@ docs/media/img/*.svg
 cscope.in.out
 cscope.po.out
 cscope.out
-fwapi-pkg-*.tar.bz2
+fwapi-pkg-*.tar.gz
 smf/manifests/fwapi.xml
