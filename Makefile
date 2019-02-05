@@ -32,8 +32,7 @@ EXTRA_DOC_DEPS	= deps/restdown-brand-remora/.git
 JS_FILES	:= $(shell ls *.js) $(shell find lib test -name '*.js')
 JSL_CONF_NODE	 = tools/jsl.node.conf
 JSL_FILES_NODE   = $(JS_FILES)
-ESLINT		= ./node_modules/.bin/eslint
-ESLINT_CONF	= tools/eslint.node.conf
+ESLINT_FLAGS	= -c tools/eslint.node.conf
 ESLINT_FILES	= $(JS_FILES)
 JSON_FILES	:= config.json.sample package.json
 JSSTYLE_FILES	 = $(JS_FILES)
@@ -75,12 +74,6 @@ AGENTS		= amon config registrar
 .PHONY: all
 all: $(SMF_MANIFESTS) | $(NPM_EXEC) $(REPO_DEPS) sdc-scripts
 	$(NPM) install --production
-
-.PHONY: eslint-npm
-eslint-npm: | $(NPM_EXEC)
-	$(NPM) install \
-	    eslint@`json -f package.json devDependencies.eslint` \
-	    eslint-plugin-joyent@`json -f package.json devDependencies.eslint-plugin-joyent`
 
 $(TAPE): | $(NPM_EXEC)
 	$(NPM) install
@@ -178,11 +171,6 @@ publish: release
   fi
 	mkdir -p $(ENGBLD_BITS_DIR)/fwapi
 	cp $(TOP)/$(RELEASE_TARBALL) $(ENGBLD_BITS_DIR)/fwapi/$(RELEASE_TARBALL)
-
-
-.PHONY: check
-check:: $(ESLINT) eslint-npm
-	$(ESLINT) -c $(ESLINT_CONF) $(ESLINT_FILES)
 
 #
 # Includes
