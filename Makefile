@@ -21,6 +21,10 @@ ISTANBUL	:= node_modules/.bin/istanbul
 FAUCET		:= node_modules/.bin/faucet
 TAPE		:= ./node_modules/.bin/tape
 
+ENGBLD_USE_BUILDIMAGE   = true
+ENGBLD_REQUIRE          := $(shell git submodule update --init deps/eng)
+include ./deps/eng/tools/mk/Makefile.defs
+TOP ?= $(error Unable to access eng.git submodule Makefiles.)
 
 #
 # Files
@@ -32,18 +36,12 @@ EXTRA_DOC_DEPS	= deps/restdown-brand-remora/.git
 JS_FILES	:= $(shell ls *.js) $(shell find lib test -name '*.js')
 JSL_CONF_NODE	 = tools/jsl.node.conf
 JSL_FILES_NODE   = $(JS_FILES)
-ESLINT_FLAGS	= -c tools/eslint.node.conf
 ESLINT_FILES	= $(JS_FILES)
 JSON_FILES	:= config.json.sample package.json
 JSSTYLE_FILES	 = $(JS_FILES)
 JSSTYLE_FLAGS    = -o indent=2,doxygen,unparenthesized-return=0,strict-indent=true
 SMF_MANIFESTS_IN = smf/manifests/fwapi.xml.in
  
-ENGBLD_USE_BUILDIMAGE	= true
-ENGBLD_REQUIRE		:= $(shell git submodule update --init deps/eng)
-include ./deps/eng/tools/mk/Makefile.defs
-TOP ?= $(error Unable to access eng.git submodule Makefiles.)
-
 ifeq ($(shell uname -s),SunOS)
 	# Allow building on a SmartOS image other than sdc-*-multiarch 15.4.1.
 	NODE_PREBUILT_IMAGE=18b094b0-eb01-11e5-80c1-175dac7ddf02
